@@ -8,6 +8,6 @@ ENV APP_HOME /usr/src/app
 COPY target/*.jar $APP_HOME/app.jar
 
 WORKDIR $APP_HOME
-//Ram
+//RamRAM
 
 CMD ["java", "-jar", "app.jar"]
