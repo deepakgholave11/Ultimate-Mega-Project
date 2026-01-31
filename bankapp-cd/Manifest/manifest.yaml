@@ -1,5 +1,7 @@
 ---
-# Secrets for MySQL
+# =========================
+# Secret for MySQL
+# =========================
 apiVersion: v1
 kind: Secret
 metadata:
@@ -7,18 +9,24 @@ metadata:
   namespace: webapps
 type: Opaque
 data:
-  MYSQL_ROOT_PASSWORD: VGVzdEAxMjM= # Base64-encoded password
+  MYSQL_ROOT_PASSWORD: VGVzdEAxMjM=   # Test@123 (base64)
+
 ---
+# =========================
 # ConfigMap for MySQL
+# =========================
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: mysql-config
   namespace: webapps
 data:
-  MYSQL_DATABASE: "bankappdb"
+  MYSQL_DATABASE: bankappdb
+
 ---
-# Storage Class for EBS
+# =========================
+# StorageClass for EBS
+# =========================
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -29,8 +37,11 @@ parameters:
   fsType: ext4
 reclaimPolicy: Retain
 volumeBindingMode: WaitForFirstConsumer
+
 ---
-# Persistent Volume Claim for MySQL
+# =========================
+# PersistentVolumeClaim
+# =========================
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -43,8 +54,11 @@ spec:
   resources:
     requests:
       storage: 5Gi
+
 ---
-# MySQL Deployment
+# =========================
+# MySQL Deployment (FIXED)
+# =========================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -62,15 +76,10 @@ spec:
         app: mysql
     spec:
       containers:
-      - image: deepakgholave/bankapp:v30
-        name: mysql
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "500m"
-          limits:
-            memory: "1Gi"
-            cpu: "1"
+      - name: mysql
+        image: mysql:8.0          # ✅ FIXED (CRITICAL)
+        ports:
+        - containerPort: 3306
         env:
         - name: MYSQL_ROOT_PASSWORD
           valueFrom:
@@ -82,41 +91,44 @@ spec:
             configMapKeyRef:
               name: mysql-config
               key: MYSQL_DATABASE
-        ports:
-        - containerPort: 3306
-          name: mysql
         volumeMounts:
-        - mountPath: /var/lib/mysql
-          name: mysql-data
+        - name: mysql-data
+          mountPath: /var/lib/mysql
         livenessProbe:
           tcpSocket:
             port: 3306
-          initialDelaySeconds: 30
+          initialDelaySeconds: 40
           periodSeconds: 10
         readinessProbe:
           exec:
             command: ["mysqladmin", "ping", "-h", "127.0.0.1"]
-          initialDelaySeconds: 30
+          initialDelaySeconds: 40
           periodSeconds: 10
       volumes:
       - name: mysql-data
         persistentVolumeClaim:
           claimName: mysql-pvc
+
 ---
+# =========================
 # MySQL Service
+# =========================
 apiVersion: v1
 kind: Service
 metadata:
   name: mysql-service
   namespace: webapps
 spec:
+  selector:
+    app: mysql
   ports:
   - port: 3306
     targetPort: 3306
-  selector:
-    app: mysql
+
 ---
+# =========================
 # BankApp Deployment
+# =========================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -135,13 +147,6 @@ spec:
       containers:
       - name: bankapp
         image: deepakgholave/bankapp:v30
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
         ports:
         - containerPort: 8080
         env:
@@ -158,20 +163,19 @@ spec:
           httpGet:
             path: /login
             port: 8080
-          initialDelaySeconds: 60
-          timeoutSeconds: 5
+          initialDelaySeconds: 90
           periodSeconds: 10
-          failureThreshold: 3
         readinessProbe:
           httpGet:
             path: /login
             port: 8080
-          initialDelaySeconds: 60
-          timeoutSeconds: 5
+          initialDelaySeconds: 90
           periodSeconds: 10
-          failureThreshold: 3
+
 ---
+# =========================
 # BankApp Service
+# =========================
 apiVersion: v1
 kind: Service
 metadata:
@@ -179,8 +183,8 @@ metadata:
   namespace: webapps
 spec:
   type: ClusterIP
+  selector:
+    app: bankapp
   ports:
   - port: 80
     targetPort: 8080
-  selector:
-    app: bankapp
